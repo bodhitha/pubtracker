@@ -1,0 +1,118 @@
+# Publication tracker: app + OKD login proxy in one pod.
+# Apply with:  oc apply -n <your-namespace> -f openshift/app.yaml
+# Before applying, edit the ConfigMap below (route hostname) and create the two secrets (see README).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pubtracker
+  annotations:
+    # lets the oauth-proxy send people back to this app's Route after they log in
+    serviceaccounts.openshift.io/oauth-redirectreference.primary: >-
+      {"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"pubtracker"}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pubtracker-config
+data:
+  AUTH_MODE: "header"
+  AUTH_HEADER: "HTTP_X_FORWARDED_USER"
+  GUNICORN_BIND: "127.0.0.1:8080"
+  # CHANGE ME: replace pubtracker.apps.example.org with the hostname of the Route
+  DJANGO_ALLOWED_HOSTS: "pubtracker.apps.example.org,localhost,127.0.0.1"
+  DJANGO_CSRF_TRUSTED_ORIGINS: "https://pubtracker.apps.example.org"
+  SITE_TITLE: "FNAL CMS group publications"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pubtracker
+  annotations:
+    # redeploy automatically whenever a new image is built into the pubtracker ImageStream
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"pubtracker:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"app\")].image"}]
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # migrations run at start-up; keep one version running at a time
+  selector:
+    matchLabels: {app: pubtracker}
+  template:
+    metadata:
+      labels: {app: pubtracker}
+    spec:
+      serviceAccountName: pubtracker
+      containers:
+        - name: app
+          image: pubtracker:latest
+          envFrom:
+            - configMapRef: {name: pubtracker-config}
+            - secretRef: {name: pubtracker-app}      # DJANGO_SECRET_KEY, DATABASE_URL
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {memory: 512Mi}
+          # the app listens on 127.0.0.1 only, so probes run inside the container
+          readinessProbe:
+            exec: {command: ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec: {command: ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+        - name: oauth-proxy
+          # use the tag that matches your cluster's version (ask your OKD admins)
+          image: quay.io/openshift/origin-oauth-proxy:4.16
+          args:
+            - --provider=openshift
+            - --openshift-service-account=pubtracker
+            - --https-address=:8443
+            - --http-address=
+            - --upstream=http://127.0.0.1:8080
+            - --tls-cert=/etc/tls/private/tls.crt
+            - --tls-key=/etc/tls/private/tls.key
+            - --cookie-secret-file=/etc/proxy/secrets/session_secret
+            - --pass-user-headers=true
+            - --skip-auth-regex=^/static/
+            # only people who can "get" this Service in the namespace are let in, so access is
+            # managed with ordinary OKD roles: oc adm policy add-role-to-user view <user> -n <ns>
+            - '--openshift-sar={"resource":"services","resourceName":"pubtracker","verb":"get"}'
+          ports:
+            - {name: https, containerPort: 8443}
+          readinessProbe:
+            httpGet: {path: /oauth/healthz, port: 8443, scheme: HTTPS}
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          volumeMounts:
+            - {name: proxy-tls, mountPath: /etc/tls/private}
+            - {name: proxy-cookie, mountPath: /etc/proxy/secrets}
+      volumes:
+        - name: proxy-tls
+          secret: {secretName: pubtracker-tls}           # created automatically by the Service annotation
+        - name: proxy-cookie
+          secret: {secretName: pubtracker-proxy}         # session_secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pubtracker
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: pubtracker-tls
+spec:
+  selector: {app: pubtracker}
+  ports:
+    - {name: https, port: 443, targetPort: 8443}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: pubtracker
+spec:
+  # host: pubtracker.apps.example.org   # set this if your admins want a specific hostname
+  to: {kind: Service, name: pubtracker}
+  port: {targetPort: https}
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect

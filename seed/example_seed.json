@@ -1,0 +1,563 @@
+{
+ "schema_version": 1,
+ "source": "Fictional example data for tests and demos; not real publications or people.",
+ "vocabularies": {
+  "roles": [
+   "author",
+   "lead_author",
+   "corresponding_author",
+   "analysis_contact",
+   "editor",
+   "ccle",
+   "arc_chair",
+   "arc_member",
+   "internal_reader",
+   "convener",
+   "developer",
+   "contributor"
+  ],
+  "statuses": {
+   "internal": [
+    "in_preparation",
+    "pre_approval",
+    "approved",
+    "cwr",
+    "final_reading",
+    "unknown"
+   ],
+   "public": [
+    "pas_public",
+    "preprint",
+    "submitted",
+    "accepted",
+    "published"
+   ]
+  },
+  "categories": {
+   "analysis": "CMS physics analysis",
+   "detector": "Detector, trigger & instrumentation",
+   "computing": "Software & computing",
+   "ml": "ML & statistical methods",
+   "pheno": "Phenomenology & theory",
+   "outreach": "Outreach & education",
+   "strategy": "Strategy, Snowmass & community"
+  },
+  "review_flags": {
+   "merged_duplicate": "Appeared more than once in the source; merged into one record",
+   "missing_identifier": "Status suggests it is public, but no arXiv/DOI/CDS/journal ref was given",
+   "status_inferred_from_cds": "Only a CDS link was given; assumed to be a public PAS",
+   "pas_number_derived": "PAS report number built from the CADI number",
+   "possibly_superseded": "May have been folded into a later result",
+   "possibly_stale": "Not updated in over a year while still pre-publication",
+   "working_title": "Title looks descriptive rather than the official title",
+   "incomplete_name": "A contributor's name is incomplete",
+   "name_assumed": "An initial was matched to a full name by guess",
+   "no_date": "No update date given",
+   "no_status": "No status given"
+  }
+ },
+ "people": [
+  {
+   "id": "alex-rivera",
+   "name": "Alex Rivera",
+   "variants": [
+    "A. Rivera"
+   ],
+   "in_group": null,
+   "inspire_id": null,
+   "orcid": null,
+   "member_from": null,
+   "member_to": null,
+   "entries": 5
+  },
+  {
+   "id": "ines-munoz",
+   "name": "Inés Muñoz",
+   "variants": [
+    "I. Munoz"
+   ],
+   "in_group": null,
+   "inspire_id": null,
+   "orcid": null,
+   "member_from": null,
+   "member_to": null,
+   "entries": 5
+  },
+  {
+   "id": "lena-brandt",
+   "name": "Lena Brandt",
+   "variants": [],
+   "in_group": null,
+   "inspire_id": null,
+   "orcid": null,
+   "member_from": null,
+   "member_to": null,
+   "entries": 3
+  },
+  {
+   "id": "tomas-ferreira",
+   "name": "Tomas Ferreira",
+   "variants": [
+    "T. Ferreira"
+   ],
+   "in_group": null,
+   "inspire_id": null,
+   "orcid": null,
+   "member_from": null,
+   "member_to": null,
+   "entries": 3
+  },
+  {
+   "id": "sam-okafor",
+   "name": "Sam Okafor",
+   "variants": [],
+   "in_group": null,
+   "inspire_id": null,
+   "orcid": null,
+   "member_from": null,
+   "member_to": null,
+   "entries": 1
+  },
+  {
+   "id": "jo-lindqvist",
+   "name": "Jo Lindqvist",
+   "variants": [],
+   "in_group": null,
+   "inspire_id": null,
+   "orcid": null,
+   "member_from": null,
+   "member_to": null,
+   "entries": 1
+  }
+ ],
+ "works": [
+  {
+   "id": "W0001",
+   "title": "Search for example particles in proton-proton collisions at √s = 13 TeV",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "published",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": "EXA-23-002",
+    "arxiv": "2403.00001",
+    "doi": "10.1000/example.0001",
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": "JHEP 04 (2024) 001",
+   "venue": "JHEP",
+   "has_other_authors": false,
+   "last_update": "2024-04-10",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "alex-rivera",
+     "roles": [
+      "ccle"
+     ]
+    },
+    {
+     "person": "ines-munoz",
+     "roles": [
+      "analysis_contact"
+     ]
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0002",
+   "title": "A descriptive working title for an analysis in preparation",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "pre_approval",
+   "visibility": "internal",
+   "identifiers": {
+    "cadi": "EXA-25-017",
+    "arxiv": null,
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": null,
+   "has_other_authors": false,
+   "last_update": "2025-06-01",
+   "notes": null,
+   "review_flags": [
+    "working_title"
+   ],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "lena-brandt",
+     "roles": [
+      "analysis_contact"
+     ]
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0003",
+   "title": "Measurement of an example cross section at √s = 13.6 TeV",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "cwr",
+   "visibility": "internal",
+   "identifiers": {
+    "cadi": "EXA-25-020",
+    "arxiv": null,
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": null,
+   "has_other_authors": false,
+   "last_update": "2025-06-01",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "ines-munoz",
+     "roles": [
+      "editor"
+     ]
+    },
+    {
+     "person": "tomas-ferreira",
+     "roles": []
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0004",
+   "title": "Search for example resonances decaying to H→bb̄",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "submitted",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": "EXA-24-031",
+    "arxiv": "2502.00002",
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": "PRD",
+   "has_other_authors": false,
+   "last_update": "2025-02-20",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "alex-rivera",
+     "roles": [
+      "ccle",
+      "editor"
+     ]
+    }
+   ],
+   "links": [
+    {
+     "work": "W0005",
+     "relation": "submitted_together"
+    }
+   ]
+  },
+  {
+   "id": "W0005",
+   "title": "Combination of example searches with 138 fb⁻¹",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "submitted",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": "EXA-24-032",
+    "arxiv": "2502.00003",
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": "PRD",
+   "has_other_authors": false,
+   "last_update": "2025-02-20",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "alex-rivera",
+     "roles": [
+      "ccle"
+     ]
+    },
+    {
+     "person": "lena-brandt",
+     "roles": []
+    }
+   ],
+   "links": [
+    {
+     "work": "W0004",
+     "relation": "submitted_together"
+    }
+   ]
+  },
+  {
+   "id": "W0006",
+   "title": "Machine learning for example triggers",
+   "category": "ml",
+   "doc_type": "journal_article",
+   "status": "published",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": null,
+    "arxiv": "2310.00004",
+    "doi": "10.1000/example.0006",
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": "Mach.Learn.Sci.Tech. 5 (2024) 015001",
+   "venue": "MLST",
+   "has_other_authors": true,
+   "last_update": "2024-01-15",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "ines-munoz",
+     "roles": [
+      "corresponding_author"
+     ]
+    },
+    {
+     "person": "tomas-ferreira",
+     "roles": [
+      "developer"
+     ]
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0007",
+   "title": "Search for example dark photons (PAS)",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "pas_public",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": "EXA-24-010",
+    "arxiv": null,
+    "doi": null,
+    "cds": null,
+    "report_number": "CMS-PAS-EXA-24-010",
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": null,
+   "has_other_authors": false,
+   "last_update": "2024-09",
+   "notes": null,
+   "review_flags": [
+    "pas_number_derived"
+   ],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "alex-rivera",
+     "roles": [
+      "ccle"
+     ]
+    },
+    {
+     "person": "ines-munoz",
+     "roles": []
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0008",
+   "title": "Example detector upgrade performance",
+   "category": "detector",
+   "doc_type": "proceedings",
+   "status": "published",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": null,
+    "arxiv": "2311.00005",
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": "PoS EXAMPLE2023 (2024) 101",
+   "venue": "EXAMPLE 2023",
+   "has_other_authors": false,
+   "last_update": "2024-03-01",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "tomas-ferreira",
+     "roles": [
+      "author"
+     ]
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0009",
+   "title": "An entry the old list gave no status for",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "unknown",
+   "visibility": "internal",
+   "identifiers": {
+    "cadi": null,
+    "arxiv": null,
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": null,
+   "has_other_authors": false,
+   "last_update": null,
+   "notes": null,
+   "review_flags": [
+    "no_status",
+    "no_date"
+   ],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "lena-brandt",
+     "roles": []
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0010",
+   "title": "Early studies for a future example analysis",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "in_preparation",
+   "visibility": "internal",
+   "identifiers": {
+    "cadi": null,
+    "arxiv": null,
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": null,
+   "has_other_authors": false,
+   "last_update": "2025-06-01",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "ines-munoz",
+     "roles": [
+      "analysis_contact"
+     ]
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0011",
+   "title": "Explaining example physics to students",
+   "category": "outreach",
+   "doc_type": "magazine_article",
+   "status": "published",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": null,
+    "arxiv": null,
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": "https://example.org/magazine/2024/example"
+   },
+   "journal_ref": "Example Magazine (Mar 2024)",
+   "venue": null,
+   "has_other_authors": false,
+   "last_update": "2024-03",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "jo-lindqvist",
+     "roles": [
+      "author"
+     ]
+    }
+   ],
+   "links": []
+  },
+  {
+   "id": "W0012",
+   "title": "Search for example long-lived particles with displaced jets",
+   "category": "analysis",
+   "doc_type": "cms_collab",
+   "status": "accepted",
+   "visibility": "public",
+   "identifiers": {
+    "cadi": "EXA-23-040",
+    "arxiv": "2409.00006",
+    "doi": null,
+    "cds": null,
+    "report_number": null,
+    "url": null
+   },
+   "journal_ref": null,
+   "venue": "JHEP",
+   "has_other_authors": false,
+   "last_update": "2025-05-02",
+   "notes": null,
+   "review_flags": [],
+   "source_section": "example",
+   "contributors": [
+    {
+     "person": "alex-rivera",
+     "roles": [
+      "arc_member"
+     ]
+    },
+    {
+     "person": "sam-okafor",
+     "roles": []
+    }
+   ],
+   "links": []
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{% extends "pubs/base.html" %}
+{% block title %}Add me | {{ site_title }}{% endblock %}
+{% block content %}
+<div class="form-page">
+  <p class="back"><a href="{{ work.get_absolute_url }}">Back to the entry</a></p>
+  <h1>{% if existing %}Your roles on this paper{% else %}Add me to this paper{% endif %}</h1>
+  <p class="paper-name">{{ work.title }}</p>
+  <form method="post" class="entry-form">{% csrf_token %}
+    {% if form.person %}
+      <p class="help">Your login isn't linked to anyone in the roster yet. Pick yourself once and the tool will remember.</p>
+      {% include "pubs/_field.html" with field=form.person %}
+    {% else %}
+      <p class="help">Adding yourself as {{ me.name }}.</p>
+    {% endif %}
+    <fieldset class="roles"><legend>Your roles on this paper</legend>
+      <div class="chips">{% for cb in form.roles %}<label class="chip">{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div>
+      <p class="help">Leave all unticked if you contributed without a named role.</p>
+    </fieldset>
+    <div class="actions">
+      <button type="submit">{% if existing %}Save my roles{% else %}Add me{% endif %}</button>
+      <a href="{{ work.get_absolute_url }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

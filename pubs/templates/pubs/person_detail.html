@@ -1,0 +1,21 @@
+{% extends "pubs/base.html" %}{% load pubs_extras %}
+{% block title %}{{ person }} | {{ site_title }}{% endblock %}
+{% block content %}
+<article class="detail">
+  <p class="back"><a href="{% url 'person_list' %}">All people</a></p>
+  <h1>{{ person.name }}</h1>
+  <p class="muted">{% if person.inspire_id %}INSPIRE {{ person.inspire_id }}{% else %}No INSPIRE ID recorded{% endif %}{% if person.orcid %}, ORCID {{ person.orcid }}{% endif %}{% if person.in_group is None %}. Group membership not confirmed{% endif %}</p>
+  {% if role_counts %}
+  <p class="role-summary">{% for r in role_counts %}{% if r.code != 'contributor' %}<a href="{% url 'work_list' %}?person={{ person.slug }}&role={{ r.code }}">{{ r.label }} on {{ r.n }}</a>{% endif %}{% endfor %}</p>
+  {% endif %}
+  <h2>{{ contribs|length }} entries</h2>
+  <ol class="works">{% for c in contribs %}{% with work=c.work %}
+    <li class="work">
+      <div class="work-main"><a class="work-title" href="{{ work.get_absolute_url }}">{{ work.title }}</a>
+        {% with roles=c|role_list %}{% if roles %}<p class="people"><span class="role">{{ roles }}</span></p>{% endif %}{% endwith %}</div>
+      <div class="work-id">{% if work.cadi %}<span class="cadi">{{ work.cadi }}</span>{% endif %}</div>
+      {% include "pubs/_track.html" %}
+      <div class="updated">{{ work.last_update_display|default:"No date" }}</div>
+    </li>{% endwith %}{% endfor %}</ol>
+</article>
+{% endblock %}

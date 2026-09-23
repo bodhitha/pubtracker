@@ -1,0 +1,10 @@
+db.sqlite3
+staticfiles/
+**/__pycache__/
+seed/
+.git/
+openshift/
+*.png
+CLAUDE.md
+.venv/
+.claude/

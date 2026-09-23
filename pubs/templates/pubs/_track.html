@@ -1,0 +1,5 @@
+<div class="track{% if work.is_internal_stage %} is-internal{% endif %}{% if work.track_step == 5 %} is-done{% endif %}"
+     role="img" aria-label="Status: {{ work.get_status_display }}">
+  <span class="steps" aria-hidden="true">{% for step in work.track %}<i class="{% if step.done %}on{% endif %}" title="{{ step.label }}"></i>{% endfor %}</span>
+  <span class="track-label">{{ work.get_status_display }}</span>
+</div>

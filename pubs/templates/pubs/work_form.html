@@ -1,0 +1,100 @@
+{% extends "pubs/base.html" %}
+{% block title %}{% if is_new %}Add a paper{% else %}Edit {{ work }}{% endif %} | {{ site_title }}{% endblock %}
+{% block content %}
+<div class="form-page">
+  <p class="back"><a href="{% if work %}{{ work.get_absolute_url }}{% else %}{% url 'work_list' %}{% endif %}">{% if work %}Back to the entry{% else %}All publications{% endif %}</a></p>
+  <h1>{% if is_new %}Add a paper{% else %}Edit entry{% endif %}</h1>
+
+  {% if is_new %}
+  <form method="get" class="lookup">
+    <label for="lookup">Start from a CADI number, arXiv ID or DOI</label>
+    <div class="lookup-row">
+      <input id="lookup" name="lookup" value="{{ lookup_text }}" placeholder="EXO-23-002, 2403.05311 or 10.1103/...">
+      <button type="submit">Look up</button>
+    </div>
+    <p class="help">This fills in the details from INSPIRE and checks whether the paper is already here. For work still in internal review, skip this and fill in the form.</p>
+  </form>
+  {% if existing %}
+    <div class="notice notice-exists" role="status">
+      <p><strong>This paper is already in the tracker:</strong> <a href="{{ existing.get_absolute_url }}">{{ existing.title }}</a></p>
+      <p class="notice-actions"><a class="button" href="{% url 'work_add_me' existing.code %}">Add me to this paper</a> <a href="{% url 'work_edit' existing.code %}">Edit the entry</a></p>
+    </div>
+  {% elif lookup_msg %}
+    <div class="notice notice-{{ lookup_msg.0 }}" role="status"><p>{{ lookup_msg.1 }}</p></div>
+  {% endif %}
+  {% endif %}
+
+  {% if not existing %}
+  <form method="post" class="entry-form" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="notice notice-error" role="alert">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    {% if form.errors or formset.total_error_count %}{% if not form.non_field_errors %}<div class="notice notice-error" role="alert"><p>Some fields need fixing. They're marked below.</p></div>{% endif %}{% endif %}
+
+    <fieldset><legend>The paper</legend>
+      {% include "pubs/_field.html" with field=form.title wide=True %}
+      <div class="grid3">
+        {% include "pubs/_field.html" with field=form.category %}
+        {% include "pubs/_field.html" with field=form.doc_type %}
+        {% include "pubs/_field.html" with field=form.status %}
+      </div>
+    </fieldset>
+
+    <fieldset><legend>Identifiers</legend>
+      <p class="help">Fill in whatever exists so far. Once any of these is public, the entry counts as public.</p>
+      <div class="grid2">
+        {% include "pubs/_field.html" with field=form.cadi %}
+        {% include "pubs/_field.html" with field=form.arxiv %}
+        {% include "pubs/_field.html" with field=form.doi %}
+        {% include "pubs/_field.html" with field=form.report_number %}
+        {% include "pubs/_field.html" with field=form.cds %}
+        {% include "pubs/_field.html" with field=form.inspire_recid %}
+      </div>
+      {% include "pubs/_field.html" with field=form.url wide=True %}
+    </fieldset>
+
+    <fieldset><legend>Publication</legend>
+      <div class="grid2">
+        {% include "pubs/_field.html" with field=form.journal_ref %}
+        {% include "pubs/_field.html" with field=form.venue %}
+      </div>
+      {% include "pubs/_field.html" with field=form.has_other_authors %}
+    </fieldset>
+
+    <fieldset><legend>Group contributors</legend>
+      <p class="help">Everyone from the group with a significant role. Person not listed? <a href="{% url 'person_new' %}?next={{ request.get_full_path|urlencode }}">Add them</a> first, then come back.</p>
+      {{ formset.management_form }}
+      {% for e in formset.non_form_errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+      <div id="contributors">
+        {% for f in formset %}{% include "pubs/_contributor.html" %}{% endfor %}
+      </div>
+      <template id="empty-contributor">{% with f=formset.empty_form %}{% include "pubs/_contributor.html" %}{% endwith %}</template>
+      <button type="button" class="secondary" id="add-contributor">Add another person</button>
+    </fieldset>
+
+    <fieldset><legend>Notes</legend>
+      {% include "pubs/_field.html" with field=form.notes wide=True %}
+      {% if form.resolved_flags %}
+      <fieldset class="review-box resolve"><legend>Review notes from the old list</legend>
+        <p class="help">Tick any this edit takes care of.</p>
+        {% for cb in form.resolved_flags %}<label class="check">{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}
+      </fieldset>
+      {% endif %}
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit">{% if is_new %}Add paper{% else %}Save changes{% endif %}</button>
+      <a href="{% if work %}{{ work.get_absolute_url }}{% else %}{% url 'work_list' %}{% endif %}">Cancel</a>
+    </div>
+  </form>
+  <script>
+    document.getElementById("add-contributor").addEventListener("click", function () {
+      var total = document.getElementById("id_contributions-TOTAL_FORMS");
+      var html = document.getElementById("empty-contributor").innerHTML.replace(/__prefix__/g, total.value);
+      document.getElementById("contributors").insertAdjacentHTML("beforeend", html);
+      total.value = parseInt(total.value, 10) + 1;
+      var rows = document.querySelectorAll("#contributors .contributor");
+      rows[rows.length - 1].querySelector("select").focus();
+    });
+  </script>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "pubs/base.html" %}
+{% block title %}Add a person | {{ site_title }}{% endblock %}
+{% block content %}
+<div class="form-page narrow">
+  <p class="back"><a href="{{ request.GET.next|default:'/people/' }}">Back</a></p>
+  <h1>Add a person</h1>
+  <form method="post" class="entry-form">{% csrf_token %}
+    {% for field in form %}{% include "pubs/_field.html" %}{% endfor %}
+    <div class="actions"><button type="submit">Add person</button></div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "pubs/base.html" %}
+{% block content %}
+<form method="post" class="login">{% csrf_token %}
+  <h1>Sign in</h1>
+  {% if form.errors %}<p class="error">That username and password don't match. Try again.</p>{% endif %}
+  <label for="id_username">Username</label>{{ form.username }}
+  <label for="id_password">Password</label>{{ form.password }}
+  <button type="submit">Sign in</button>
+</form>
+{% endblock %}

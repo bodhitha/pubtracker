@@ -1,0 +1,78 @@
+{% extends "pubs/base.html" %}{% load pubs_extras %}
+{% block title %}{{ work }} | {{ site_title }}{% endblock %}
+{% block content %}
+<article class="detail">
+  <p class="back"><a href="{% url 'work_list' %}">All publications</a></p>
+  <h1>{{ work.title }}</h1>
+  <div class="detail-status">
+    {% include "pubs/_track.html" %}
+    <span class="visibility vis-{{ work.visibility }}">{{ work.get_visibility_display }}</span>
+    <span class="detail-actions">
+      <a class="button" href="{% url 'work_add_me' work.code %}">{% if i_am_on_it %}Change my roles{% else %}Add me to this paper{% endif %}</a>
+      <a class="button secondary" href="{% url 'work_edit' work.code %}">Edit</a>
+    </span>
+  </div>
+
+  {% if work.review_flags %}
+  <section class="review-box" aria-labelledby="review-h">
+    <h2 id="review-h">Needs review</h2>
+    <ul>{% for code, text in work.flag_help %}<li>{{ text }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  <div class="detail-grid">
+    <section aria-labelledby="contrib-h">
+      <h2 id="contrib-h">Group contributors</h2>
+      <ul class="contrib">
+        {% for c in work.contributions.all %}
+        <li><a href="{{ c.person.get_absolute_url }}">{{ c.person.name }}</a>
+          {% with roles=c|role_list %}{% if roles %}<span class="role">{{ roles }}</span>{% endif %}{% endwith %}
+          {% if c.membership_uncertain %}<span class="uncertain">Membership uncertain</span>{% endif %}</li>
+        {% endfor %}
+        {% if work.has_other_authors %}<li class="muted">And other authors</li>{% endif %}
+      </ul>
+    </section>
+
+    <section aria-labelledby="facts-h">
+      <h2 id="facts-h">Details</h2>
+      <dl class="facts">
+        <dt>Category</dt><dd>{{ work.get_category_display }}</dd>
+        <dt>Type</dt><dd>{{ work.get_doc_type_display }}</dd>
+        {% if work.cadi %}<dt>CADI</dt><dd>{{ work.cadi }}</dd>{% endif %}
+        {% if work.report_number %}<dt>Report number</dt><dd>{{ work.report_number }}</dd>{% endif %}
+        {% if work.arxiv %}<dt>arXiv</dt><dd><a href="https://arxiv.org/abs/{{ work.arxiv }}">{{ work.arxiv }}</a></dd>{% endif %}
+        {% if work.doi %}<dt>DOI</dt><dd><a href="https://doi.org/{{ work.doi }}">{{ work.doi }}</a></dd>{% endif %}
+        {% if work.cds %}<dt>CDS</dt><dd><a href="https://cds.cern.ch/record/{{ work.cds }}">{{ work.cds }}</a></dd>{% endif %}
+        {% if work.url %}<dt>Link</dt><dd><a href="{{ work.url }}">{{ work.url|truncatechars:60 }}</a></dd>{% endif %}
+        {% if work.journal_ref %}<dt>Journal</dt><dd>{{ work.journal_ref }}</dd>{% endif %}
+        {% if work.venue %}<dt>Venue</dt><dd>{{ work.venue }}</dd>{% endif %}
+        <dt>Last update</dt><dd>{{ work.last_update_display|default:"Not recorded" }}</dd>
+      </dl>
+    </section>
+  </div>
+
+  {% if work.notes %}<section aria-labelledby="notes-h"><h2 id="notes-h">Notes</h2><p class="notes">{{ work.notes }}</p></section>{% endif %}
+
+  {% if links %}
+  <section aria-labelledby="links-h"><h2 id="links-h">Related entries</h2>
+    <ul class="plain">{% for label, other in links %}<li>{{ label }} <a href="{{ other.get_absolute_url }}">{{ other }}</a></li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {% if edits %}
+  <section aria-labelledby="edits-h"><h2 id="edits-h">Edit history</h2>
+    <ul class="history">{% for e in edits %}
+      <li><span>{% if e.action == "created" %}Added{% elif e.action == "added_self" %}Added themselves{% elif e.action == "inspire" %}Nightly INSPIRE check{% else %}Edited{% endif %}</span>
+        <span class="muted">{% if e.action != "inspire" %}by {{ e.user.get_username|default:"someone" }}, {% endif %}{{ e.at|date:"j M Y, H:i" }}</span>
+        {% if e.changes %}<ul class="changes">{% for c in e.changes %}<li>{{ c.field }}: {% if c.old %}<del>{{ c.old|truncatechars:80 }}</del> {% endif %}{% if c.new %}<ins>{{ c.new|truncatechars:80 }}</ins>{% endif %}</li>{% endfor %}</ul>{% endif %}
+      </li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  <section aria-labelledby="hist-h"><h2 id="hist-h">Status history</h2>
+    <ul class="history">{% for h in history %}
+      <li><span>{{ h.new_label }}</span> <span class="muted">{{ h.changed_at|date:"j M Y" }}, {% if h.source == "import" %}imported from the old list{% elif h.source == "inspire" %}from INSPIRE{% else %}by {{ h.changed_by.get_username|default:"a curator" }}{% endif %}</span></li>
+    {% endfor %}</ul>
+  </section>
+</article>
+{% endblock %}

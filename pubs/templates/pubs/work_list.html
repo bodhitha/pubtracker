@@ -1,0 +1,128 @@
+{% extends "pubs/base.html" %}{% load pubs_extras %}
+{% block content %}
+<div class="layout">
+  <aside class="filters" aria-label="Filters">
+    <form method="get" class="search">
+      <label for="q">Search</label>
+      <input id="q" name="q" type="search" value="{{ q }}" placeholder="Title, CADI, arXiv, DOI or name">
+      {% if g.person %}<input type="hidden" name="person" value="{{ g.person }}">{% endif %}
+      {% if g.role %}<input type="hidden" name="role" value="{{ g.role }}">{% endif %}
+      {% if g.year %}<input type="hidden" name="year" value="{{ g.year }}">{% endif %}
+      {% if g.category %}<input type="hidden" name="category" value="{{ g.category }}">{% endif %}
+      {% if g.status %}<input type="hidden" name="status" value="{{ g.status }}">{% endif %}
+      {% if g.visibility %}<input type="hidden" name="visibility" value="{{ g.visibility }}">{% endif %}
+      {% if g.review %}<input type="hidden" name="review" value="{{ g.review }}">{% endif %}
+      <button type="submit">Search</button>
+    </form>
+
+    <details class="filter-panel" id="filter-panel"{% if filters_active %} open{% endif %}>
+    <summary>Filters</summary>
+    <form method="get" class="selects">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      {% for key, val in g.items %}{% if key in "category status visibility review sort" %}<input type="hidden" name="{{ key }}" value="{{ val }}">{% endif %}{% endfor %}
+      <label for="person">Person</label>
+      <select id="person" name="person" onchange="this.form.submit()">
+        <option value="">Anyone</option>
+        {% for p in people %}<option value="{{ p.slug }}" {% if g.person == p.slug %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+      </select>
+      <label for="role">Role</label>
+      <select id="role" name="role" onchange="this.form.submit()">
+        <option value="">Any role</option>
+        {% for r in roles %}<option value="{{ r.code }}" {% if g.role == r.code %}selected{% endif %}>{{ r.label }}</option>{% endfor %}
+      </select>
+      <label for="year">Last updated in</label>
+      <select id="year" name="year" onchange="this.form.submit()">
+        <option value="">Any year</option>
+        {% for y in years %}<option value="{{ y }}" {% if g.year == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>{% endfor %}
+      </select>
+      <noscript><button type="submit">Apply</button></noscript>
+    </form>
+
+    <fieldset class="facet"><legend>Status</legend>
+      {% for value, label, n in facets.status %}{% if n or g.status == value %}
+        <a href="{% if g.status == value %}{% qs_set 'status' '' %}{% else %}{% qs_set 'status' value %}{% endif %}" {% if g.status == value %}aria-current="true"{% endif %}><span>{{ label }}</span><span class="n">{{ n }}</span></a>
+      {% endif %}{% endfor %}
+    </fieldset>
+    <fieldset class="facet"><legend>Category</legend>
+      {% for value, label, n in facets.category %}{% if n or g.category == value %}
+        <a href="{% if g.category == value %}{% qs_set 'category' '' %}{% else %}{% qs_set 'category' value %}{% endif %}" {% if g.category == value %}aria-current="true"{% endif %}><span>{{ label }}</span><span class="n">{{ n }}</span></a>
+      {% endif %}{% endfor %}
+    </fieldset>
+    <fieldset class="facet"><legend>Visibility</legend>
+      {% for value, label, n in facets.visibility %}{% if n or g.visibility == value %}
+        <a href="{% if g.visibility == value %}{% qs_set 'visibility' '' %}{% else %}{% qs_set 'visibility' value %}{% endif %}" {% if g.visibility == value %}aria-current="true"{% endif %}><span>{{ label }}</span><span class="n">{{ n }}</span></a>
+      {% endif %}{% endfor %}
+    </fieldset>
+    <p class="facet-toggle">
+      <a href="{% if g.review == '1' %}{% qs_set 'review' '' %}{% else %}{% qs_set 'review' '1' %}{% endif %}" {% if g.review == '1' %}aria-current="true"{% endif %}>Only entries that need review</a>
+    </p>
+    </details>
+    {% if filters_active %}<p><a class="clear" href="{% url 'work_list' %}">Clear all filters</a></p>{% endif %}
+  </aside>
+  <script>
+    // Filters are always open on wide screens; on phones they fold behind "Filters".
+    if (window.matchMedia("(min-width: 60.01rem)").matches) document.getElementById("filter-panel").open = true;
+    // The download menu closes on a click elsewhere or Escape, like other menus.
+    document.addEventListener("click", e => {
+      const menu = document.getElementById("export-menu");
+      if (menu && !menu.contains(e.target)) menu.open = false;
+    });
+    document.addEventListener("keydown", e => {
+      const menu = document.getElementById("export-menu");
+      if (e.key === "Escape" && menu && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  </script>
+
+  <section class="results" aria-labelledby="results-heading">
+    <div class="results-head">
+      <h1 id="results-heading">{% if filters_active %}{{ page.paginator.count }} of {{ total }} publications{% else %}{{ total }} publications{% endif %}</h1>
+      <div class="sort">Sort by
+        <a href="{% qs_set 'sort' '' %}" {% if sort == 'updated' %}aria-current="true"{% endif %}>last update</a>
+        <a href="{% qs_set 'sort' 'title' %}" {% if sort == 'title' %}aria-current="true"{% endif %}>title</a>
+        <a href="{% qs_set 'sort' 'cadi' %}" {% if sort == 'cadi' %}aria-current="true"{% endif %}>CADI</a>
+        <details class="export" id="export-menu">
+          <summary>Download {% if filters_active %}these{% else %}all{% endif %}</summary>
+          <ul>{% for fmt, label, hint in export_formats %}
+            <li><a href="{% url 'work_export' fmt %}{% if querystring %}?{{ querystring }}{% endif %}">{{ label }}<span>{{ hint }}</span></a></li>{% endfor %}
+          </ul>
+        </details>
+      </div>
+    </div>
+
+    {% if page.object_list %}
+    <ol class="works">
+      {% for work in page.object_list %}
+      <li class="work">
+        <div class="work-main">
+          <a class="work-title" href="{{ work.get_absolute_url }}">{{ work.title }}</a>
+          <p class="people">
+            {% for c in work.contributions.all %}<a href="{{ c.person.get_absolute_url }}">{{ c.person.name }}</a>{% if c.membership_uncertain %}<abbr title="Membership uncertain">?</abbr>{% endif %}{% with roles=c|role_list %}{% if roles %} <span class="role">{{ roles }}</span>{% endif %}{% endwith %}{% if not forloop.last %}, {% endif %}{% endfor %}{% if work.has_other_authors %}, et al.{% endif %}
+          </p>
+          {% if work.review_flags %}<p class="needs-review">Needs review ({{ work.review_flags|length }})</p>{% endif %}
+        </div>
+        <div class="work-id">
+          {% if work.cadi %}<span class="cadi">{{ work.cadi }}</span>{% endif %}
+          {% if work.arxiv %}<span>arXiv:{{ work.arxiv }}</span>{% elif work.journal_ref %}<span>{{ work.journal_ref }}</span>{% elif work.venue %}<span>{{ work.venue }}</span>{% endif %}
+        </div>
+        {% include "pubs/_track.html" %}
+        <div class="updated">{{ work.last_update_display|default:"No date" }}</div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+      <div class="empty">
+        <p>No publications match these filters.</p>
+        <p><a href="{% url 'work_list' %}">Clear all filters</a> or search for a CADI number, arXiv ID or name instead.</p>
+      </div>
+    {% endif %}
+
+    {% if page.has_other_pages %}
+    <nav class="pager" aria-label="Pages">
+      {% if page.has_previous %}<a href="?{{ querystring }}{% if querystring %}&{% endif %}page={{ page.previous_page_number }}">Previous</a>{% endif %}
+      <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+      {% if page.has_next %}<a href="?{{ querystring }}{% if querystring %}&{% endif %}page={{ page.next_page_number }}">Next</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

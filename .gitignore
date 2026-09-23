@@ -1,0 +1,9 @@
+db.sqlite3
+staticfiles/
+__pycache__/
+.venv/
+.claude/launch.json
+# Real data (internal CMS information) never goes into git; only the fictional example seed does.
+seed/*
+!seed/example_seed.json
+*.csv

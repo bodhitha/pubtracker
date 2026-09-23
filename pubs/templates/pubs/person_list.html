@@ -1,0 +1,23 @@
+{% extends "pubs/base.html" %}{% load pubs_extras %}
+{% block title %}People | {{ site_title }}{% endblock %}
+{% block content %}
+<section class="people-page">
+  <div class="results-head">
+    <h1>People</h1>
+    <div class="sort">Show
+      <a href="{% qs_set 'group' '' %}" {% if not group %}aria-current="true"{% endif %}>everyone</a>
+      <a href="{% qs_set 'group' 'unconfirmed' %}" {% if group == 'unconfirmed' %}aria-current="true"{% endif %}>group membership not confirmed</a>
+    </div>
+  </div>
+  <table class="roster">
+    <thead><tr>{% for col in columns %}
+      <th scope="col"{% if col.numeric %} class="num"{% endif %}{% if col.aria_sort %} aria-sort="{{ col.aria_sort }}"{% endif %}><a href="{% qs_set 'sort' col.next %}">{{ col.label }}</a></th>{% endfor %}
+    </tr></thead>
+    <tbody>{% for p in people %}
+      <tr><td><a href="{{ p.get_absolute_url }}">{{ p.name }}</a>{% if p.variants %}<span class="muted"> also {{ p.variants|join:", " }}</span>{% endif %}</td>
+        <td>{% if p.in_group is None %}<span class="muted">Not confirmed</span>{% elif p.in_group %}Yes{% else %}No{% endif %}</td>
+        <td>{{ p.inspire_id|default:"—" }}</td><td class="num">{{ p.n }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+</section>
+{% endblock %}

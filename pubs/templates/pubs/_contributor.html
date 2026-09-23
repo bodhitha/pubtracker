@@ -1,0 +1,11 @@
+<div class="contributor">
+  {{ f.id }}
+  <div class="field">
+    <label for="{{ f.person.id_for_label }}">Person</label>{{ f.person }}
+    {% for e in f.person.errors %}<p class="field-error">{{ e }}</p>{% endfor %}
+  </div>
+  <fieldset class="roles"><legend>Roles</legend>
+    <div class="chips">{% for cb in f.roles %}<label class="chip">{{ cb.tag }} {{ cb.choice_label }}</label>{% endfor %}</div>
+  </fieldset>
+  {% if f.instance.pk %}<label class="check remove">{{ f.DELETE }} Remove</label>{% endif %}
+</div>
