@@ -1,0 +1,21 @@
+# Example settings for `helm lint` / `helm template` (not a real deployment).
+global:
+  pubtracker:
+    host: pubtracker.example.org
+image:
+  repository: registry.example.org/cms/pubtracker
+ingress:
+  className: nginx
+  tls:
+    certManager:
+      issuerRef:
+        name: letsencrypt-prod
+oauth2-proxy:
+  config:
+    existingSecret: pubtracker-oidc
+  authenticatedEmailsFile:
+    restricted_access: |-
+      ada@example.org
+      bob@example.org
+  extraArgs:
+    oidc-issuer-url: https://sso.example.org/realms/example

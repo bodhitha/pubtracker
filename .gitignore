@@ -7,3 +7,8 @@ __pycache__/
 seed/*
 !seed/example_seed.json
 *.csv
+.DS_Store
+db.sqlite3-wal
+db.sqlite3-shm
+# fetched by `helm dependency build`
+charts/pubtracker/charts/

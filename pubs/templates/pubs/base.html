@@ -19,6 +19,8 @@
       {{ user.get_username }}
       {% if auth_mode == "local" %}
         <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="linklike">Sign out</button></form>
+      {% else %}
+        <a href="/oauth2/sign_out">Sign out</a>
       {% endif %}
     </div>
   </header>

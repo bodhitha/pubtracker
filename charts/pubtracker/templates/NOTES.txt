@@ -1,0 +1,21 @@
+{{- $name := include "pubtracker.fullname" . -}}
+The publication tracker is at https://{{ include "pubtracker.host" . }} once the pod is ready:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ $name }}
+
+First install? Load the data and name the curators (their sign-in email addresses):
+
+  kubectl -n {{ .Release.Namespace }} exec -i deploy/{{ $name }} -- python manage.py import_seed /dev/stdin < seed/fnal_publications_seed.json
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ $name }} -- python manage.py grant_curator someone@example.org
+
+{{- if not .Values.inspireSync.enabled }}
+
+The nightly INSPIRE sync is off. Check that the pod can reach INSPIRE, then turn it on
+with --set inspireSync.enabled=true:
+
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ $name }} -- python manage.py check_inspire
+{{- end }}
+{{- if .Values.backup.enabled }}
+
+Nightly database copies go to the {{ .Values.backup.persistence.existingClaim | default (printf "%s-backups" $name) }} volume ({{ .Values.backup.keep }} kept).
+{{- end }}

@@ -1,0 +1,11 @@
+apiVersion: v2
+name: pubtracker
+description: Publication tracker for the FNAL CMS group, behind oauth2-proxy (OIDC sign-in).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.25.0-0"
+dependencies:
+  - name: oauth2-proxy
+    version: "~10.7.0"
+    repository: https://oauth2-proxy.github.io/manifests

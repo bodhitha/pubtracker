@@ -1,7 +1,8 @@
-# Red Hat's UBI Python image already runs as a non-root user in group 0, which is what
-# OKD expects: it starts containers under a random UID that belongs to group 0.
+# Red Hat's UBI Python image runs as a non-root user (1001) in group 0. Files are made group-writable
+# so the image also works where the cluster picks an arbitrary UID in group 0 (OpenShift does this).
 FROM registry.access.redhat.com/ubi9/python-312:latest
 
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /opt/app-root/src
 COPY --chown=1001:0 requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

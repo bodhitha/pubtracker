@@ -1,0 +1,78 @@
+{{- $jobs := list }}
+{{- if .Values.backup.enabled }}
+{{- $jobs = append $jobs (dict "name" "backup" "schedule" .Values.backup.schedule "backoffLimit" 1 "backups" true
+      "command" (list "python" "manage.py" "backup_db" "/backups" "--keep" (toString .Values.backup.keep))) }}
+{{- end }}
+{{- if .Values.inspireSync.enabled }}
+{{- /* no retry: the next night's run picks up anything this one missed */}}
+{{- $jobs = append $jobs (dict "name" "inspire-sync" "schedule" .Values.inspireSync.schedule "backoffLimit" 0 "backups" false
+      "command" (list "python" "manage.py" "sync_inspire")) }}
+{{- end }}
+{{- range $jobs }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "pubtracker.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "pubtracker.labels" $ | nindent 4 }}
+spec:
+  schedule: {{ .schedule | quote }}
+  {{- with $.Values.cronJobs.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .backoffLimit }}
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: pubtracker-{{ .name }}
+            app.kubernetes.io/instance: {{ $.Release.Name }}
+        spec:
+          restartPolicy: Never
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets: {{ toYaml . | nindent 12 }}
+          {{- end }}
+          automountServiceAccountToken: false
+          securityContext:
+            {{- include "pubtracker.podSecurityContext" $ | nindent 12 }}
+          affinity:
+            {{- include "pubtracker.nextToApp" $ | nindent 12 }}
+          containers:
+            - name: {{ .name }}
+              image: {{ include "pubtracker.image" $ }}
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              command: {{ toJson .command }}
+              env:
+                {{- include "pubtracker.env" $ | nindent 16 }}
+              securityContext:
+                {{- include "pubtracker.containerSecurityContext" $ | nindent 16 }}
+              resources:
+                {{- toYaml $.Values.cronJobs.resources | nindent 16 }}
+              volumeMounts:
+                - {name: data, mountPath: /data}
+                - {name: tmp, mountPath: /tmp}
+                {{- if .backups }}
+                - {name: backups, mountPath: /backups}
+                {{- end }}
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ include "pubtracker.dataClaim" $ }}
+            - name: tmp
+              emptyDir: {}
+            {{- if .backups }}
+            - name: backups
+              persistentVolumeClaim:
+                claimName: {{ $.Values.backup.persistence.existingClaim | default (printf "%s-backups" (include "pubtracker.fullname" $)) }}
+            {{- end }}
+          {{- with $.Values.tolerations }}
+          tolerations: {{ toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

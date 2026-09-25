@@ -1,0 +1,23 @@
+{{- if and .Values.ingress.enabled .Values.ingress.tls.enabled .Values.ingress.tls.certManager.enabled }}
+{{- $cm := .Values.ingress.tls.certManager }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "pubtracker.fullname" . }}
+  labels:
+    {{- include "pubtracker.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "pubtracker.fullname" .)) }}
+  dnsNames:
+    - {{ include "pubtracker.host" . | quote }}
+  issuerRef:
+    name: {{ $cm.issuerRef.name }}
+    kind: {{ $cm.issuerRef.kind | default "ClusterIssuer" }}
+    group: {{ $cm.issuerRef.group | default "cert-manager.io" }}
+  {{- with $cm.duration }}
+  duration: {{ . }}
+  {{- end }}
+  {{- with $cm.renewBefore }}
+  renewBefore: {{ . }}
+  {{- end }}
+{{- end }}

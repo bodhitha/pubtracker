@@ -2,7 +2,7 @@ from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.test import TestCase, modify_settings, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 
 from .models import Person, StatusChange, Work
 
@@ -45,13 +45,59 @@ class SeedAndPagesTest(TestCase):
         self.assertEqual((latest.old_status, latest.new_status, latest.changed_by), ("pre_approval", "approved", self.user))
 
 
-@override_settings(ALLOWED_HOSTS=["testserver"], STORAGES=PLAIN_STATIC, AUTHENTICATION_BACKENDS=["django.contrib.auth.backends.RemoteUserBackend"])
-@modify_settings(MIDDLEWARE={"append": "pubs.auth.ProxyHeaderMiddleware"})
-class ProxyHeaderTest(TestCase):
-    def test_proxy_header_logs_in(self):
-        # LoginRequiredMiddleware runs before the appended proxy middleware here, so check via /healthz + session
-        self.client.get("/healthz", HTTP_X_FORWARDED_USER="jdoe")
-        self.assertTrue(User.objects.filter(username="jdoe").exists())
+PROXY_SECRET = "shared-with-oauth2-proxy-0123456789"
+
+
+def _proxy_middleware():
+    from django.conf import settings
+    mw = [m for m in settings.MIDDLEWARE if m != "pubs.auth.ProxyAuthMiddleware"]
+    mw.insert(mw.index("django.contrib.auth.middleware.AuthenticationMiddleware") + 1, "pubs.auth.ProxyAuthMiddleware")
+    return mw
+
+
+def _basic(user, password):
+    import base64
+    return "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
+
+
+@override_settings(ALLOWED_HOSTS=["testserver"], STORAGES=PLAIN_STATIC, AUTH_PROXY_SECRET=PROXY_SECRET,
+                   MIDDLEWARE=_proxy_middleware(),
+                   AUTHENTICATION_BACKENDS=["django.contrib.auth.backends.RemoteUserBackend"])
+class ProxyAuthTest(TestCase):
+    def test_proxy_vouched_user_is_signed_in(self):
+        r = self.client.get("/", HTTP_AUTHORIZATION=_basic("Ada.Member@Example.org", PROXY_SECRET))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["user"].username, "ada.member@example.org")
+
+    def test_forged_identities_are_refused(self):
+        for headers in [{"HTTP_AUTHORIZATION": _basic("ada@example.org", "guessed-password")},
+                        {"HTTP_X_FORWARDED_USER": "ada@example.org"},
+                        {"HTTP_PUBTRACKER_PROXY_USER": "ada@example.org"},
+                        {"HTTP_AUTHORIZATION": "Basic not-base64!"}]:
+            self.assertEqual(self.client.get("/", **headers).status_code, 302, headers)
+        self.assertFalse(User.objects.exists())
+
+    def test_session_alone_is_not_enough(self):
+        self.client.get("/", HTTP_AUTHORIZATION=_basic("ada@example.org", PROXY_SECRET))
+        self.assertEqual(self.client.get("/").status_code, 302)   # same session, but not through the proxy
+
+
+class BackupTest(TransactionTestCase):
+    # not TestCase: SQLite's online backup waits while the connection has an open write transaction,
+    # and the nightly job, like this test, runs outside one
+    def test_backup_copies_database_and_keeps_newest(self):
+        import sqlite3
+        import tempfile
+        Person.objects.create(slug="kept", name="Kept Person")
+        with tempfile.TemporaryDirectory() as folder:
+            for old in ("2020-01-01", "2020-01-02", "2020-01-03"):
+                Path(folder, f"pubtracker-{old}.sqlite3").write_text("old")
+            call_command("backup_db", folder, "--keep", "2", stdout=open("/dev/null", "w"))
+            copies = sorted(p.name for p in Path(folder).glob("pubtracker-*.sqlite3"))
+            self.assertEqual(len(copies), 2)
+            self.assertEqual(copies[0], "pubtracker-2020-01-03.sqlite3")
+            with sqlite3.connect(Path(folder, copies[-1])) as db:
+                self.assertEqual(db.execute("select name from pubs_person").fetchall(), [("Kept Person",)])
 
 
 class RosterImportTest(TestCase):

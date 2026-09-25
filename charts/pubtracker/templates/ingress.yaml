@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+{{- $host := include "pubtracker.host" . }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "pubtracker.fullname" . }}
+  labels:
+    {{- include "pubtracker.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations: {{ toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts: [{{ $host | quote }}]
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "pubtracker.fullname" .)) }}
+  {{- end }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          # everything goes through oauth2-proxy, which signs people in and forwards to the app
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "pubtracker.proxyFullname" . }}
+                port:
+                  number: {{ (index .Values "oauth2-proxy").service.portNumber | default 80 }}
+{{- end }}

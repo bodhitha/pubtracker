@@ -1,0 +1,135 @@
+# Publication tracker. See the README ("Deploy with Helm") for a walk-through.
+
+# Shared with the oauth2-proxy subchart, which needs the hostname and the shared Secret too.
+global:
+  pubtracker:
+    # Required: the public hostname, e.g. pubtracker.example.org
+    host: ""
+    # Secret with keys `django-secret-key` and `proxy-password`. Leave empty to have the chart create one
+    # with random values (kept across `helm upgrade`). Set it when deploying with GitOps tools that
+    # render templates without cluster access, or the values would change on every sync.
+    existingSecret: ""
+
+image:
+  # Required: where you pushed the image built from the Dockerfile, e.g. registry.example.org/cms/pubtracker
+  repository: ""
+  tag: ""                      # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+siteTitle: FNAL CMS group publications
+gunicornWorkers: 2
+inspire:
+  url: ""                      # default https://inspirehep.net/api/literature
+  timeout: ""                  # seconds, default 8
+extraEnv: []                   # more environment variables for the app and its jobs
+
+# The SQLite database lives on this volume. SQLite needs single-writer block storage (ReadWriteOnce);
+# don't use NFS or other network filesystems, where its locking is unreliable.
+persistence:
+  existingClaim: ""
+  size: 1Gi
+  storageClass: ""
+  accessModes: [ReadWriteOnce]
+
+resources:
+  requests: {cpu: 50m, memory: 192Mi}
+  limits: {memory: 512Mi}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 1001                # lets the app (UID 1001) write to the volume on plain Kubernetes
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile: {type: RuntimeDefault}
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
+# OpenShift assigns each namespace its own UID and fsGroup range and rejects pods that ask for others.
+# "auto" leaves out fsGroup/runAsUser/runAsGroup when the cluster serves OpenShift's security API.
+# Set "true" on OpenShift when rendering without cluster access (helm template, GitOps).
+openshift: auto
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Only oauth2-proxy may reach the app. It also proves itself with the shared proxy-password,
+# so this is a second layer; keep it on unless your cluster doesn't enforce NetworkPolicy.
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  tls:
+    enabled: true
+    secretName: ""             # default <release>-pubtracker-tls
+    # Create a cert-manager Certificate for the host, stored in the TLS Secret above.
+    # Needs cert-manager (cert-manager.io) in the cluster. Turn off to supply your own TLS Secret.
+    certManager:
+      enabled: true
+      issuerRef:
+        name: ""               # required when enabled, e.g. letsencrypt-prod
+        kind: ClusterIssuer    # or Issuer
+        group: cert-manager.io
+      duration: ""             # e.g. 2160h; empty uses the issuer's default
+      renewBefore: ""
+
+# Nightly jobs. They share the database volume, which can only be mounted on one node, so they are
+# scheduled next to the app pod.
+cronJobs:
+  timeZone: ""                 # e.g. America/Chicago; empty uses the cluster's (usually UTC)
+  resources:
+    requests: {cpu: 20m, memory: 128Mi}
+    limits: {memory: 256Mi}
+
+backup:
+  enabled: true
+  schedule: "30 2 * * *"
+  keep: 14                     # daily copies to keep
+  persistence:
+    existingClaim: ""
+    size: 2Gi
+    storageClass: ""
+
+# Turn on once `manage.py check_inspire` succeeds from the app pod (see README).
+inspireSync:
+  enabled: false
+  schedule: "15 3 * * *"       # after the backup, so each night's copy predates the sync
+
+oauth2-proxy:
+  config:
+    # Secret with keys client-id, client-secret and cookie-secret for your OIDC client (see README).
+    existingSecret: ""
+    emailDomains: []           # e.g. ["fnal.gov"] lets in everyone with such an address; see below
+    upstreams: []              # set by extraArgs.upstream
+  # Who may sign in: one email per line. Members can edit every entry, so keep this list tight.
+  # Alternatively use config.emailDomains, or extraArgs.allowed-group with your provider's groups.
+  authenticatedEmailsFile:
+    enabled: true
+    restricted_access: ""
+  extraArgs:
+    provider: oidc
+    oidc-issuer-url: ""        # required: your sign-in service's OIDC issuer URL
+    scope: openid email profile
+    code-challenge-method: S256
+    upstream: 'http://{{ include "pubtracker.fullname" . }}:8080'
+    redirect-url: 'https://{{ .Values.global.pubtracker.host }}/oauth2/callback'
+    reverse-proxy: true
+    skip-provider-button: true
+    cookie-secure: true
+    # The app accepts a user only with this password (proxy-password in the shared Secret).
+    pass-basic-auth: true
+    prefer-email-to-user: true
+  extraEnv:
+    - name: OAUTH2_PROXY_BASIC_AUTH_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "pubtracker.secretName" . }}'
+          key: proxy-password
+  # The chart's default fixed UID/GID (2000) is refused on OpenShift; the image's own non-root user works everywhere.
+  securityContext:
+    runAsUser: null
+    runAsGroup: null

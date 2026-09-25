@@ -1,0 +1,73 @@
+{{- include "pubtracker.validate" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pubtracker.fullname" . }}
+  labels:
+    {{- include "pubtracker.labels" . | nindent 4 }}
+spec:
+  replicas: 1                  # SQLite: one writer; migrations run at start-up
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "pubtracker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pubtracker.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- include "pubtracker.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: app
+          image: {{ include "pubtracker.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "pubtracker.env" . | nindent 12 }}
+            - name: GUNICORN_BIND
+              value: "0.0.0.0:8080"
+            - name: GUNICORN_WORKERS
+              value: {{ .Values.gunicornWorkers | quote }}
+            - name: FORWARDED_ALLOW_IPS
+              value: "*"
+          ports:
+            - name: http
+              containerPort: 8080
+          # exec probes: they reach the app as localhost (an allowed host) and aren't subject to the NetworkPolicy
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          securityContext:
+            {{- include "pubtracker.containerSecurityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "pubtracker.dataClaim" . }}
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}

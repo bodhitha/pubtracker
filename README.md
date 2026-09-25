@@ -7,7 +7,7 @@ publication. Stage 1 gives you:
 - a searchable list with filters by person, role, status, category, visibility and year
 - pages for each publication and each person
 - curator editing through the **Curate** pages, with every status change logged
-- login through your OKD cluster, with access controlled by ordinary OKD roles
+- sign-in through your institution's single sign-on (OIDC, via oauth2-proxy), limited to the people you list
 
 Stage 2 lets every group member:
 
@@ -45,7 +45,7 @@ Files that include CMS-internal entries say so at the top; filter by Visibility:
 sharing one outside the group.
 
 Stage 3 adds a nightly INSPIRE sync that fills in identifiers and journal references and moves
-entries forward as they become preprints and journal papers (see step 6b below). Stage 4 will
+entries forward as they become preprints and journal papers (see step 7 below). Stage 4 will
 add charts and exports.
 
 ## Try it on your laptop
@@ -68,96 +68,147 @@ outside git (`.gitignore` blocks everything in `seed/` except the example, and a
 To work with real data locally, put the seed at `seed/fnal_publications_seed.json` and import
 that instead (`import_seed --replace` swaps out the example).
 
-## Deploy on OKD
+## Deploy with Helm
 
-All commands run in your project's namespace (`oc project <namespace>`).
+The chart in `charts/pubtracker` uses only standard Kubernetes resources, so it runs on any
+cluster, OpenShift/OKD included. You need `helm` (3.8+), `kubectl`, an image registry the
+cluster can pull from, an OIDC client at your sign-in service, and, for automatic TLS,
+[cert-manager](https://cert-manager.io). All commands run in your namespace
+(`kubectl config set-context --current --namespace=<namespace>`) and assume the release is
+called `pubtracker`.
 
-**1. Database.** If your institution offers managed PostgreSQL, ask for a database and use its
-connection string below. Otherwise run one in the namespace:
+**1. Build and push the image** (`docker` works the same way):
 
 ```bash
-oc create secret generic pubtracker-db \
-  --from-literal=POSTGRESQL_USER=pubtracker \
-  --from-literal=POSTGRESQL_PASSWORD="$(openssl rand -hex 24)" \
-  --from-literal=POSTGRESQL_DATABASE=pubtracker
-oc apply -f openshift/postgres.yaml
+podman build -t registry.example.org/cms/pubtracker:1.0.0 .
+podman push registry.example.org/cms/pubtracker:1.0.0
 ```
 
-This also sets up a nightly `pg_dump` to a separate volume, keeping 14 days.
+The chart's `appVersion` is the default tag; set `image.tag` for any other.
 
-**2. Secrets for the app and the login proxy.**
+**2. Register an OIDC client** with your sign-in service, with the redirect URI
+`https://<your host>/oauth2/callback`, and put its details in a Secret:
 
 ```bash
-DB_PASS=$(oc get secret pubtracker-db -o jsonpath='{.data.POSTGRESQL_PASSWORD}' | base64 -d)
-oc create secret generic pubtracker-app \
-  --from-literal=DJANGO_SECRET_KEY="$(openssl rand -hex 32)" \
-  --from-literal=DATABASE_URL="postgres://pubtracker:${DB_PASS}@pubtracker-db:5432/pubtracker"
-oc create secret generic pubtracker-proxy --from-literal=session_secret="$(openssl rand -hex 16)"
+kubectl create secret generic pubtracker-oidc \
+  --from-literal=client-id=<client id> \
+  --from-literal=client-secret=<client secret> \
+  --from-literal=cookie-secret="$(openssl rand -hex 16)"
 ```
 
-**3. Build the image** from this directory (no Git credentials needed):
+**3. Write your values** in a file such as `my-values.yaml` (keep it out of git if it lists
+people):
 
-```bash
-oc new-build --strategy=docker --binary --name=pubtracker
-oc set image-lookup pubtracker
-oc start-build pubtracker --from-dir=. --follow
+```yaml
+global:
+  pubtracker:
+    host: pubtracker.example.org
+image:
+  repository: registry.example.org/cms/pubtracker
+ingress:
+  className: nginx                 # your cluster's ingress class
+  tls:
+    certManager:
+      issuerRef:
+        name: letsencrypt-prod     # a cert-manager ClusterIssuer
+oauth2-proxy:
+  config:
+    existingSecret: pubtracker-oidc
+  authenticatedEmailsFile:
+    restricted_access: |-
+      someone@example.org
+      another@example.org
+  extraArgs:
+    oidc-issuer-url: https://sso.example.org/realms/example   # your sign-in service's issuer
 ```
 
-**4. Deploy.** Apply once to create the Route, read its hostname, put that hostname into the
-ConfigMap, and apply again:
+**Who may sign in.** Members can edit every entry, so the chart refuses settings that would let
+in anyone with an account at the sign-in service. Choose one of:
+
+- a list of email addresses, as above;
+- whole email domains: `oauth2-proxy.config.emailDomains: [example.org]` with
+  `oauth2-proxy.authenticatedEmailsFile.enabled: false`;
+- a group at the sign-in service: `emailDomains: ["*"]` with
+  `oauth2-proxy.extraArgs.allowed-group: <group>` (the service must send a groups claim).
+
+`charts/pubtracker/values.yaml` documents every setting. Without cert-manager, set
+`ingress.tls.certManager.enabled: false` and `ingress.tls.secretName` to an existing TLS Secret.
+
+**4. Install:**
 
 ```bash
-oc apply -f openshift/app.yaml
-oc get route pubtracker -o jsonpath='{.spec.host}'
-# edit DJANGO_ALLOWED_HOSTS and DJANGO_CSRF_TRUSTED_ORIGINS in openshift/app.yaml, then:
-oc apply -f openshift/app.yaml && oc rollout restart deployment/pubtracker
+helm dependency build charts/pubtracker
+helm upgrade --install pubtracker charts/pubtracker -f my-values.yaml
+kubectl rollout status deployment/pubtracker
 ```
 
 **5. Load the data and name the curators.** The seed file contains internal CMS information,
-so it is kept out of the image and streamed in directly:
+so it is kept out of the image and streamed in directly. Curators are named by the email address
+they sign in with:
 
 ```bash
-oc exec -i deploy/pubtracker -c app -- python manage.py import_seed /dev/stdin < seed/fnal_publications_seed.json
-oc exec deploy/pubtracker -c app -- python manage.py grant_curator <your-okd-username>
+kubectl exec -i deploy/pubtracker -- python manage.py import_seed /dev/stdin < seed/fnal_publications_seed.json
+kubectl exec deploy/pubtracker -- python manage.py grant_curator someone@example.org
 ```
 
 **6. Check whether auto-fill can work.**
 
 ```bash
-oc exec deploy/pubtracker -c app -- python manage.py check_inspire
+kubectl exec deploy/pubtracker -- python manage.py check_inspire
 ```
 
 If it can't reach INSPIRE, everything else still works; members just type the details in.
-Ask your OKD admins to allow outbound HTTPS to `inspirehep.net` from the namespace, then run
+Ask your cluster admins to allow outbound HTTPS to `inspirehep.net` from the namespace, then run
 the check again. No restart is needed.
 
-**6b. Turn on the nightly INSPIRE sync** once the check passes. Look at what it would change
-first, then schedule it:
+**7. Turn on the nightly INSPIRE sync** once the check passes. Look at what it would change
+first, then set `inspireSync.enabled: true` in your values and upgrade:
 
 ```bash
-oc exec deploy/pubtracker -c app -- python manage.py sync_inspire --dry-run
-oc apply -f openshift/inspire-sync.yaml
+kubectl exec deploy/pubtracker -- python manage.py sync_inspire --dry-run
+helm upgrade pubtracker charts/pubtracker -f my-values.yaml
 ```
 
-Every night at 03:15 (after the database dump) it looks up each entry that has a CADI number,
+Every night at 03:15 (after the database copy) it looks up each entry that has a CADI number,
 arXiv ID, DOI or INSPIRE record number, fills in identifiers and journal references that are
 still empty, and moves the status forward (PAS public, preprint, published). It never
 overwrites what someone entered and never moves a status back. If INSPIRE contradicts an
 entry, or gives an identifier that another entry already has, it changes nothing and marks
 the entry "Needs review", with the details in its edit history. Changes appear in each entry's
-history as "Nightly INSPIRE check". `oc logs job/<name>` shows a run's output
-(`oc get jobs` lists them); `sync_inspire W0012` checks a single entry.
+history as "Nightly INSPIRE check". `kubectl get jobs` lists the runs and `kubectl logs job/<name>`
+shows one; `sync_inspire W0012` checks a single entry. Schedules are in the cluster's time zone
+(usually UTC) unless you set `cronJobs.timeZone`.
 
-**7. Let group members in.** Anyone with the `view` role on the namespace can open the tool:
+**Code updates:** build and push a new tag, then
+`helm upgrade pubtracker charts/pubtracker -f my-values.yaml --set image.tag=<tag>`. The app
+restarts on the new image and applies database migrations at start-up; existing data is kept.
+
+**On OpenShift/OKD** the chart notices OpenShift's security API and leaves out the fixed
+`fsGroup`, which OpenShift would refuse (it assigns UIDs and groups per namespace). When
+rendering without cluster access (`helm template`, GitOps tools), set `openshift: true`. The
+Ingress becomes a Route automatically; use the cluster's ingress class (often
+`openshift-default`). The `Certificate` needs the cert-manager operator; otherwise turn it off
+and supply a TLS Secret.
+
+### Storage and backups
+
+The database is one SQLite file on the `pubtracker-data` volume, which `helm uninstall` leaves
+in place. It needs block storage with `ReadWriteOnce` access; don't use NFS or other network
+filesystems, where SQLite's locking is unreliable. Only one app pod runs, and the nightly jobs
+are scheduled on its node so they can share the volume.
+
+Every night at 02:30 a job copies the database to the `pubtracker-backups` volume and keeps the
+last 14 copies (`backup.*` in the values). Ask your admins whether volume snapshots cover these
+volumes; either way, copy backups off the cluster now and then:
 
 ```bash
-oc adm policy add-role-to-user view <username>
-# or, for a whole group defined in OKD:
-oc adm policy add-role-to-group view <groupname>
+kubectl exec deploy/pubtracker -- python manage.py backup_db /tmp/copy --keep 1
+kubectl cp "$(kubectl get pod -l app.kubernetes.io/name=pubtracker -o name | cut -d/ -f2)":/tmp/copy ./pubtracker-backup
 ```
 
-Code updates: `oc start-build pubtracker --from-dir=. --follow`. The deployment restarts on
-the new image and applies database migrations at start-up; existing data is kept.
+To restore, scale the Deployment to 0, then from a pod that mounts `pubtracker-data` replace
+`/data/pubtracker.sqlite3` with the copy and delete `pubtracker.sqlite3-wal` and
+`pubtracker.sqlite3-shm` next to it; scale back to 1.
 
 ## Filling in the roster
 
@@ -168,9 +219,9 @@ like Cristián Peña keep their accents), then check and load it:
 # locally
 python manage.py import_roster people_roster_review.csv --dry-run
 python manage.py import_roster people_roster_review.csv
-# on OKD
-oc exec -i deploy/pubtracker -c app -- python manage.py import_roster /dev/stdin --dry-run < people_roster_review.csv
-oc exec -i deploy/pubtracker -c app -- python manage.py import_roster /dev/stdin < people_roster_review.csv
+# on the cluster
+kubectl exec -i deploy/pubtracker -- python manage.py import_roster /dev/stdin --dry-run < people_roster_review.csv
+kubectl exec -i deploy/pubtracker -- python manage.py import_roster /dev/stdin < people_roster_review.csv
 ```
 
 `--dry-run` lists every change without saving. If any row has a problem (a mistyped ORCID,
@@ -197,26 +248,30 @@ copied into `inspire_id` and `orcid`, and only where those were empty. Sort by
 `match_confidence`, open the profile links for anything `medium`, `low` or `none`, then load
 the file with `import_roster` as above; it ignores the extra columns.
 
-## Things to check with your OKD admins
+## Things to check with your cluster admins
 
-- **oauth-proxy image tag.** `openshift/app.yaml` uses `quay.io/openshift/origin-oauth-proxy:4.16`;
-  use the tag matching your cluster. If your admins prefer that apps log in directly with the
-  lab's single sign-on (OIDC), the app only needs a different login backend, and the rest stays.
-- **Base images.** The Dockerfile pulls from `registry.access.redhat.com` and the database from
-  `quay.io`. Some clusters require a mirror.
+- **Sign-in service.** An OIDC client for the tool (redirect URI `https://<host>/oauth2/callback`),
+  and, if you restrict sign-in by group, whether the service sends a groups claim.
+- **Ingress and TLS.** The ingress class to use, and a cert-manager issuer (or a TLS Secret).
+- **Storage.** A storage class with `ReadWriteOnce` block storage (not NFS) for the database.
+- **NetworkPolicy.** Whether the cluster enforces it (most do); the chart uses one to let only
+  oauth2-proxy reach the app.
 - **Outbound network access.** Auto-fill and the nightly sync need HTTPS to `inspirehep.net`.
-  Some clusters block this by default.
-- **Backups.** Ask whether volume snapshots already cover the database; either way, copy the
-  nightly dumps somewhere off the cluster.
+- **Images.** The app image comes from your registry (with `imagePullSecrets` if needed); its base
+  image from `registry.access.redhat.com` and oauth2-proxy from `quay.io`. Some clusters require
+  a mirror.
 
 ## How login works
 
-The pod runs two containers. The **oauth-proxy** container is the only thing the Route can
-reach: it sends people through the cluster's login page and checks that they have access to
-the namespace. It then forwards the request, with the username in `X-Forwarded-User`, to the
-**app** container, which listens only on `127.0.0.1` inside the pod and so cannot be reached
-around the proxy. New users are created automatically on their first visit.
-`grant_curator` gives someone access to the Curate pages.
+The Ingress sends everything to **oauth2-proxy**, which signs people in with your sign-in
+service (OIDC) and admits only the addresses, domains or groups you allowed. It then forwards
+each request to the **app**, naming the person (their email address) in an HTTP Basic auth
+header together with a password only the two of them know (`proxy-password` in the chart's
+Secret). The app accepts a person only with that password, on every request, so a request that
+didn't come through the proxy is anonymous. A NetworkPolicy also lets only oauth2-proxy reach
+the app. New users are created on their first visit, named by their lowercased email address;
+`grant_curator` gives someone access to the Curate pages. "Sign out" ends the oauth2-proxy
+session.
 
 ## Layout
 
@@ -224,11 +279,12 @@ around the proxy. New users are created automatically on their first visit.
 config/            Django settings (all read from environment variables)
 pubs/models.py     people, memberships, works, contributions, roles, links, status history
 pubs/views.py      list, detail and people pages; /healthz for probes
-pubs/management/   import_seed, import_roster, export_roster, grant_curator, check_inspire, sync_inspire
+pubs/management/   import_seed, import_roster, export_roster, grant_curator, check_inspire, sync_inspire, backup_db
 pubs/forms.py      the member-facing forms;  pubs/inspire.py  INSPIRE lookup;  pubs/sync.py  nightly sync
+pubs/auth.py       accepts the user oauth2-proxy vouches for
 pubs/templates/    page templates;  pubs/static/pubs/app.css  styles
 seed/              example_seed.json (fictional, for tests); the real seed stays outside git and the image
 tools/lookup_ids.py  suggests INSPIRE IDs and ORCIDs for the roster (run anywhere)
-openshift/         app.yaml (app, proxy, Service, Route), postgres.yaml (database and backups),
-                   inspire-sync.yaml (nightly INSPIRE sync)
+charts/pubtracker/ Helm chart: app, oauth2-proxy (subchart), Ingress, Certificate, NetworkPolicy,
+                   nightly backup and INSPIRE sync
 ```

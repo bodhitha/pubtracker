@@ -6,10 +6,13 @@ class Command(BaseCommand):
     help = "Give a user curator rights: access to the Curate (admin) pages and permission to edit entries."
 
     def add_arguments(self, parser):
-        parser.add_argument("username", help="The username as your OKD login reports it")
+        parser.add_argument("username", help="The login name; in production, the person's email address "
+                                             "as the sign-in service reports it")
         parser.add_argument("--revoke", action="store_true")
 
     def handle(self, username, revoke, **opts):
+        if "@" in username:
+            username = username.lower()  # proxy logins are lowercased emails (pubs.auth.proxy_user)
         group, _ = Group.objects.get_or_create(name="Curators")
         group.permissions.set(Permission.objects.filter(content_type__app_label="pubs"))
         user, created = User.objects.get_or_create(username=username)

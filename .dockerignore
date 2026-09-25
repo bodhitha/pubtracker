@@ -1,10 +1,13 @@
 db.sqlite3
+db.sqlite3-*
 staticfiles/
 **/__pycache__/
 seed/
 .git/
-openshift/
+charts/
 *.png
+*.csv
 CLAUDE.md
 .venv/
 .claude/
+.DS_Store
